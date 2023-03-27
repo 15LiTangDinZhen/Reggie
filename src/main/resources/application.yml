@@ -9,6 +9,10 @@ spring:
     url: jdbc:mysql://localhost:3306/reggie?useUnicode=true&characterEncoding=UTF-8&zeroDateTimeBehavior=convertToNull&useSSL=true
     username: root
     password: 123abc
+  redis:
+    host: 172.0.0.1
+    port: 6379
+    database: 0
 
 mybatis-plus:
   configuration:
@@ -21,3 +25,4 @@ mybatis-plus:
 
 reggie:
   path: E:\image\
+
