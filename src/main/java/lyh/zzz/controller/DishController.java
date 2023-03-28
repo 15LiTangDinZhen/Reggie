@@ -14,10 +14,13 @@ import lyh.zzz.service.DishFlavorService;
 import lyh.zzz.service.DishService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
 
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 
@@ -37,6 +40,10 @@ public class DishController {
 
     @Autowired
     private CategoryService categoryService;
+
+
+    @Autowired
+    private RedisTemplate redisTemplate;
 
 
     //新增菜品
@@ -110,6 +117,14 @@ public class DishController {
     @PutMapping
     public R<String> update(@RequestBody DishDto dto){
 
+
+        //清除所有缓存
+//        Set keys = redisTemplate.keys("dish_*");
+//        redisTemplate.delete(keys);
+
+        String key = "dish_" + dto.getCategoryId() + "_" + dto.getStatus();
+        redisTemplate.delete(key);
+
         dishService.updateWithFlavor(dto);
 
 
@@ -120,6 +135,19 @@ public class DishController {
 
     @GetMapping("/list")
     public R<List<DishDto>> list(Dish dish){
+
+        List<DishDto> dtos = null;
+
+        String key = "dish_" + dish.getCategoryId() + "_" + dish.getStatus();
+
+        //从缓存中获取数据
+        dtos = (List<DishDto>)redisTemplate.opsForValue().get(key);
+
+        if (dtos != null){
+            return R.success(dtos);
+        }
+
+
         LambdaQueryWrapper<Dish> queryWrapper = new LambdaQueryWrapper<>();
 
         queryWrapper.eq(dish.getCategoryId() != null,Dish::getCategoryId,dish.getCategoryId());
@@ -129,7 +157,7 @@ public class DishController {
 
         List<Dish> list = dishService.list(queryWrapper);
 
-        List<DishDto> dtos = list.stream().map((item) -> {
+         dtos = list.stream().map((item) -> {
 
 
             DishDto dishDto = new DishDto();
@@ -157,6 +185,7 @@ public class DishController {
         }).collect(Collectors.toList());
 
 
+         redisTemplate.opsForValue().set(key,dtos,60, TimeUnit.MINUTES);
 
         return R.success(dtos);
     }

@@ -7,6 +7,8 @@ import lyh.zzz.common.R;
 import lyh.zzz.entity.User;
 import lyh.zzz.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.SetOperations;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -15,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpSession;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author LYHzzz
@@ -28,8 +31,12 @@ public class UserController {
     @Autowired
     private UserService userService;
 
+
+    @Autowired
+    private RedisTemplate redisTemplate;
+
     @PostMapping("/sendMsg")  //发送验证码
-    public R<String> sendMsg(@RequestBody User user, HttpSession session){
+    public R<String> sendMsg(@RequestBody User user,HttpSession session){
 
 /*
     获取手机号
@@ -48,12 +55,14 @@ public class UserController {
             System.out.println("发出的验证码 ： "+code);
 
             //SMSUtils.sendMessage("瑞吉外卖","",phone,code);
-
+//
             session.setAttribute("phone",phone);
             session.setAttribute("code",code);
-            session.setMaxInactiveInterval(99999);
+//            session.setMaxInactiveInterval(99999);
 
-            System.out.println("保存的验证码 ："+session.getAttribute("code"));
+            redisTemplate.opsForValue().set(phone,code,5, TimeUnit.MINUTES);
+
+            //System.out.println("保存的验证码 ："+session.getAttribute("code"));
 
             return R.success("手机验证码已发送");
 
@@ -78,9 +87,11 @@ public class UserController {
         String phone = map.get("phone").toString();
 
         String code1 = map.get("code").toString();
+//
+//        String code2 = session.getAttribute("code").toString();
+//        System.out.println(code2);
 
-        String code2 = session.getAttribute("code").toString();
-        System.out.println(code2);
+        String code2 = (String) redisTemplate.opsForValue().get(phone);
 
         if(code2 != null && code2.equals(code1)){
             LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<>();
@@ -97,7 +108,8 @@ public class UserController {
 
                 userService.save(user);
             }
-            session.setAttribute("user",user.getId());
+           session.setAttribute("user",user.getId());
+            redisTemplate.delete(phone);
             return R.success(user);
         }
 
